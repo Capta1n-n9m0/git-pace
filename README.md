@@ -8,13 +8,14 @@ your machine.
 
 ## Quick start
 
-    git clone <this repository>
+    git clone https://github.com/Capta1n-n9m0/git-pace.git
     python git-pace/gitpace.py path/to/some/repo
 
 Your browser opens the page. Press **Refresh** on the page after new commits; press Ctrl+C in the terminal to
 stop the server.
 
-Requirements: Python 3.7 or newer and `git` on the `PATH`. Works on Windows, macOS and Linux.
+Requirements: Python 3.7 or newer and `git` on the `PATH`. Tested on Windows; it uses only portable parts of Python
+and git, so macOS and Linux should work too.
 
 ## Options
 
@@ -40,7 +41,8 @@ Pick a period (All, 24 h, 7, 30 or 90 days) or drag across the bar chart to zoom
   flatten everything else.
 - **Work sessions:** commits closer together than the *session break* (45 minutes by default, adjustable)
   form one session. Each session is listed with its start, end, length, commits and lines changed.
-- **Size of the code:** lines added minus lines removed, over the whole history.
+- **Size of the code:** lines added minus lines removed, counted from the first commit and drawn over the
+  chosen period.
 - **Commits** in the period, newest first, with lines added and removed and the folders they touched.
 
 Hover over anything for the numbers behind it. The page follows your system's light or dark theme and works
@@ -56,7 +58,8 @@ size of the code, and the list of commits (oldest first, up to 300).
 
 - History comes from `git log --no-merges --numstat` on the current branch, read fresh on every load.
 - Merge commits are left out, so merged work is counted once, in its original commits.
-- Binary files count as 0 lines. Renames count only the lines that changed.
+- Binary files count as 0 lines. Renames count only the lines that changed (with git's default
+  rename detection).
 - A session's length is from its first to its last commit. Time spent before the first commit of a session
   is not visible in git, so **active time is an underestimate**, and "lines per active hour" an overestimate.
   A session with a single commit has length zero.

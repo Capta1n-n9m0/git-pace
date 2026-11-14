@@ -103,15 +103,16 @@ def main():
     p.add_argument("--no-browser", action="store_true")
     args = p.parse_args()
     repo = Path(args.repo).resolve()
-    if subprocess.run(["git", "-C", str(repo), "rev-parse", "--git-dir"],
-                      capture_output=True).returncode != 0:
+    top = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-toplevel"], capture_output=True)
+    if top.returncode != 0:
         sys.exit(f"Not a git repository: {repo}")
+    repo = Path(top.stdout.decode().strip()).resolve()  # a subfolder shows the whole repository anyway
     try:
         server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(repo))
     except OSError:  # port taken, or reserved by Windows: let the system pick a free one
         server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(repo))
     url = f"http://127.0.0.1:{server.server_address[1]}/"
-    print(f"Git pace for {repo}\n  {url}   (Ctrl+C to stop)")
+    print(f"Git pace for {repo}\n  {url}   (Ctrl+C to stop)", flush=True)
     if not args.no_browser:
         webbrowser.open(url)
     try:
