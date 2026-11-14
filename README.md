@@ -17,4 +17,8 @@ What the page shows, for the chosen period (All / 24 h / 7 / 30 / 90 days, or a 
 - **Size of the code:** added minus removed lines, all time.
 - **Commits** in the period, newest first.
 
+**Picture report** makes one PNG of the chosen period, to save or copy and paste: totals, when the commits
+happened (first to last commit, a tick per commit), lines changed with the value on each bar, the size of the
+code with its axis fitted to the period, and the list of commits (oldest first, up to 300).
+
 Merge commits are left out. Binary files count as 0 lines.
