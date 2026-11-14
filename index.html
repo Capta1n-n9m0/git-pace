@@ -475,7 +475,8 @@ function renderCommitTable(commits, folders, color) {
 
 /* ---------- picture report ---------- */
 // One standalone SVG of the chosen period (always the light palette), turned into a PNG to save or paste.
-const RW = 1200, RP = 32, RFONT = `"Segoe UI", system-ui, -apple-system, sans-serif`;
+let RW = 1200; // set per report: wide enough that every bar gets room for its number
+const RP = 32, RFONT = `"Segoe UI", system-ui, -apple-system, sans-serif`;
 const REPORT_STYLE = `svg{--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink-2:#52514e;--muted:#898781;--grid:#e1e0d9;
 --axis:#c3c2b7;--ring:rgba(11,11,11,0.10);--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--add:#006300;--del:#d03b3b}
 text{font-family:${RFONT};font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
@@ -522,8 +523,9 @@ function buildReport() {
   const color = Object.fromEntries(folders.series.map((k, i) => [k, COLORS[i]]));
   const r = currentRange(all);
   const inRange = all.filter(c => c.t * 1000 >= r[0] && c.t * 1000 <= r[1]);
-  let bkey = state.bucket;
-  if (bkey === "auto") { bkey = "1mo"; for (const k of ["15m", "1h", "1d", "1w", "1mo"]) if ((r[1] - r[0]) / BUCKETS[k].ms <= 48) { bkey = k; break; } }
+  const bkey = pickBucket(r); // same bars as the page (auto: up to 120), the picture grows wider instead
+  const nBars = Math.ceil((r[1] - r[0]) / BUCKETS[bkey].ms) + 1;
+  RW = Math.min(3200, Math.max(1200, Math.round(nBars * 26 + 2 * RP + 76)));
 
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("xmlns", NS);
@@ -608,7 +610,8 @@ function reportBars(svg, y, r, commits, bkey, folders, color) {
   const sxT = t => x0 + (t - dom[0]) / (dom[1] - dom[0]) * (x1 - x0);
   // Value labels: full numbers if they fit across the bar, else short ones, else written upwards.
   const bw0 = Math.max(1, sxT(buckets[0].t1) - sxT(buckets[0].t0) - 2);
-  const labels = buckets.map(b => b.total ? (textW(fmtN(b.total), 10) <= bw0 + 6 ? fmtN(b.total) : compact(b.total)) : "");
+  const labels = buckets.map(b => b.total && bw0 >= 9 ? ( // thinner bars than this get no numbers: they would pile up
+    textW(fmtN(b.total), 10) <= bw0 + 6 ? fmtN(b.total) : compact(b.total)) : "");
   const upright = labels.some(s => s && textW(s, 10) > bw0 + 6);
   const yTopPlot = y + 44 + (upright ? Math.max(...labels.map(s => textW(s, 10))) + 2 : 14);
   const totals = buckets.map(b => b.total).sort((a, b) => b - a);
