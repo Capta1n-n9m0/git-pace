@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Git Pace</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --sel: rgba(42,120,214,0.12); --add: #006300; --del: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --sel: rgba(57,135,229,0.18); --add: #0ca30c; --del: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --sel: rgba(57,135,229,0.18); --add: #0ca30c; --del: #e66767;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 14px; }
+h1 { font-size: 22px; margin: 0; font-weight: 650; }
+h2 { font-size: 15px; margin: 0; font-weight: 600; }
+.sub { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--ring); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; color: var(--ink-2); padding: 6px 10px; font: inherit; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--ring); }
+.seg button[aria-pressed="true"] { background: var(--sel); color: var(--ink); font-weight: 600; }
+label.ctl { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-2); }
+select, .btn { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--ring);
+  border-radius: 8px; padding: 5px 8px; cursor: pointer; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 12px 14px; }
+.kpi .v { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .l { color: var(--ink-2); font-size: 12px; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 14px; margin-bottom: 8px; }
+.hint { color: var(--muted); font-size: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink-2); font-size: 12px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.chart { width: 100%; position: relative; touch-action: pan-y; }
+.chart svg { display: block; width: 100%; overflow: visible; user-select: none; }
+.chart text { fill: var(--muted); font-size: 11px; }
+.tablewrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { color: var(--ink-2); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.msg { white-space: normal; min-width: 260px; }
+td code { color: var(--muted); }
+.plus { color: var(--add); } .minus { color: var(--del); }
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: 320px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); display: none; }
+#tip b { font-weight: 600; } #tip .row { display: flex; justify-content: space-between; gap: 14px; }
+#tip .muted { color: var(--muted); }
+#err { color: var(--del); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Git pace</h1>
+    <span class="sub" id="path"></span>
+    <button class="btn" id="refresh" title="Read the git history again">Refresh</button>
+  </header>
+  <div id="err"></div>
+
+  <div class="controls">
+    <div class="seg" id="ranges" role="group" aria-label="Period">
+      <button data-r="all">All</button><button data-r="24h">24 h</button><button data-r="7d">7 days</button>
+      <button data-r="30d">30 days</button><button data-r="90d">90 days</button><button data-r="custom" hidden>Selection</button>
+    </div>
+    <label class="ctl">Bars per
+      <select id="bucket">
+        <option value="auto">auto</option><option value="15m">15 min</option><option value="1h">hour</option>
+        <option value="1d">day</option><option value="1w">week</option><option value="1mo">month</option>
+      </select></label>
+    <div class="seg" id="measure" role="group" aria-label="Measure">
+      <button data-m="lines">Lines changed</button><button data-m="commits">Commits</button>
+    </div>
+    <label class="ctl" title="Commits closer together than this belong to one work session">Session break
+      <select id="gap"><option>20</option><option>30</option><option selected>45</option><option>60</option><option>120</option></select> min</label>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card">
+    <div class="card-head"><h2 id="barsTitle">Work per hour</h2><span class="hint">Drag across the chart to zoom into a period</span></div>
+    <div class="legend" id="legend"></div>
+    <div class="chart" id="bars"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Work sessions</h2><span class="hint" id="sessHint"></span></div>
+    <div class="chart" id="sessChart"></div>
+    <div class="tablewrap"><table id="sessTable"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Size of the code</h2><span class="hint">Lines in the repository: added minus removed, all time</span></div>
+    <div class="chart" id="size"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Commits in the period</h2><span class="hint" id="commitHint"></span></div>
+    <div class="tablewrap"><table id="commitTable"></table></div>
+  </section>
+</main>
+<div id="tip"></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const MIN = 60e3, HOUR = 60 * MIN, DAY = 24 * HOUR;
+const state = { data: null, range: "all", custom: null, bucket: "auto", measure: "lines", gap: 45 };
+const COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtN = n => Math.round(n).toLocaleString("en-US");
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const pad2 = n => String(n).padStart(2, "0");
+const fmtTime = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const fmtDay = d => `${MON[d.getMonth()]} ${d.getDate()}`;
+const fmtDT = t => { const d = new Date(t); return `${fmtDay(d)}, ${fmtTime(d)}`; };
+function fmtDur(ms) {
+  const m = Math.round(ms / MIN);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h} h ${r} min` : `${h} h`;
+}
+
+/* ---------- time units (local time) ---------- */
+// A unit: {ms (approximate), floor(t), next(t)}.
+function minuteUnit(n) { return { ms: n * MIN, floor: t => { const d = new Date(t); d.setSeconds(0, 0); d.setMinutes(d.getMinutes() - d.getMinutes() % n); return +d; }, next: t => t + n * MIN }; }
+function hourUnit(n) { return { ms: n * HOUR, floor: t => { const d = new Date(t); d.setMinutes(0, 0, 0); d.setHours(d.getHours() - d.getHours() % n); return +d; },
+  next: t => { const d = new Date(t); d.setHours(d.getHours() + n); return +d; } }; }
+function dayUnit(n) { return { ms: n * DAY, floor: t => { const d = new Date(t); d.setHours(0, 0, 0, 0); if (n > 1) d.setDate(d.getDate() - (d.getDate() - 1) % n); return +d; },
+  next: t => { const d = new Date(t); d.setDate(d.getDate() + n); return +d; } }; }
+const weekUnit = { ms: 7 * DAY, floor: t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return +d; },
+  next: t => { const d = new Date(t); d.setDate(d.getDate() + 7); return +d; } };
+function monthUnit(n) { return { ms: n * 30.4 * DAY, floor: t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(1); d.setMonth(d.getMonth() - d.getMonth() % n); return +d; },
+  next: t => { const d = new Date(t); d.setMonth(d.getMonth() + n); return +d; } }; }
+const BUCKETS = { "15m": minuteUnit(15), "1h": hourUnit(1), "1d": dayUnit(1), "1w": weekUnit, "1mo": monthUnit(1) };
+const BUCKET_NAME = { "15m": "15 minutes", "1h": "hour", "1d": "day", "1w": "week", "1mo": "month" };
+const TICKS = [minuteUnit(15), minuteUnit(30), hourUnit(1), hourUnit(3), hourUnit(6), hourUnit(12), dayUnit(1), dayUnit(2), weekUnit, monthUnit(1), monthUnit(3), monthUnit(12)];
+
+/* ---------- derived data ---------- */
+function folderOrder(commits) {
+  const tot = {};
+  for (const c of commits) for (const [k, [a, d]] of Object.entries(c.f)) tot[k] = (tot[k] || 0) + a + d;
+  const sorted = Object.keys(tot).sort((x, y) => tot[y] - tot[x]);
+  // At most four colours: the three biggest folders, the rest as "Other" (or four if there are only four).
+  if (sorted.length <= 4) return { series: sorted, map: Object.fromEntries(sorted.map(k => [k, k])) };
+  const top = sorted.slice(0, 3), map = {};
+  for (const k of sorted) map[k] = top.includes(k) ? k : "Other";
+  return { series: [...top, "Other"], map };
+}
+
+function currentRange(commits) {
+  const first = commits[0].t * 1000, last = commits[commits.length - 1].t * 1000;
+  if (state.range === "custom" && state.custom) return state.custom;
+  if (state.range === "all") return [first, Math.max(last, first + HOUR)];
+  const span = { "24h": DAY, "7d": 7 * DAY, "30d": 30 * DAY, "90d": 90 * DAY }[state.range];
+  const end = Math.max(Date.now(), last);
+  return [end - span, end];
+}
+
+function pickBucket(r) {
+  if (state.bucket !== "auto") return state.bucket;
+  for (const k of ["15m", "1h", "1d", "1w", "1mo"]) if ((r[1] - r[0]) / BUCKETS[k].ms <= 120) return k;
+  return "1mo";
+}
+
+function sessions(commits, gapMin) {
+  const out = [];
+  for (const c of commits) {
+    const t = c.t * 1000, s = out[out.length - 1];
+    const lines = Object.values(c.f).reduce((n, [a, d]) => n + a + d, 0);
+    if (s && t - s.end <= gapMin * MIN) { s.end = t; s.commits++; s.lines += lines; }
+    else out.push({ start: t, end: t, commits: 1, lines });
+  }
+  return out;
+}
+
+/* ---------- drawing helpers ---------- */
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function niceMax(v) {
+  if (v <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+}
+function compact(n) { const t = v => String(Math.round(v * 100) / 100); return n >= 1e6 ? t(n / 1e6) + "M" : n >= 1e3 ? t(n / 1e3) + "k" : t(n); }
+function roundTopPath(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+function timeAxis(svg, x0, x1, r, yTop, yBase, opts = {}) {
+  const width = x1 - x0, sx = t => x0 + (t - r[0]) / (r[1] - r[0]) * width;
+  const maxTicks = Math.max(2, Math.floor(width / 80));
+  const unit = TICKS.find(u => (r[1] - r[0]) / u.ms <= maxTicks) || TICKS[TICKS.length - 1];
+  let prevDay = null;
+  for (let t = unit.floor(r[0]); t <= r[1]; t = unit.next(t)) {
+    if (t < r[0]) continue;
+    const x = sx(t), d = new Date(t);
+    if (opts.grid) el("line", { x1: x, x2: x, y1: yTop, y2: yBase, stroke: "var(--grid)", "stroke-width": 1 }, svg);
+    const sub = unit.ms < DAY;
+    const dayKey = d.toDateString();
+    const label = sub ? fmtTime(d) : unit.ms >= 28 * DAY ? `${MON[d.getMonth()]} ${d.getFullYear()}` : fmtDay(d);
+    el("text", { x, y: yBase + 15, "text-anchor": "middle" }, svg).textContent = label;
+    if (sub && dayKey !== prevDay) el("text", { x, y: yBase + 28, "text-anchor": "middle", "font-weight": 600 }, svg).textContent = fmtDay(d);
+    prevDay = dayKey;
+  }
+  return sx;
+}
+
+/* ---------- tooltip ---------- */
+const tip = $("#tip");
+function showTip(html, ev) {
+  tip.innerHTML = html; tip.style.display = "block";
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
+  if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+  tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+
+/* ---------- render ---------- */
+function render() {
+  const data = state.data; if (!data) return;
+  hideTip();
+  const all = data.commits;
+  if (!all.length) { $("#err").textContent = "This repository has no commits yet."; return; }
+  const folders = folderOrder(all);
+  const color = Object.fromEntries(folders.series.map((k, i) => [k, COLORS[i]]));
+  const r = currentRange(all);
+  const inRange = all.filter(c => c.t * 1000 >= r[0] && c.t * 1000 <= r[1]);
+  const bkey = pickBucket(r), unit = BUCKETS[bkey];
+
+  for (const b of document.querySelectorAll("#ranges button")) {
+    b.setAttribute("aria-pressed", b.dataset.r === state.range);
+    if (b.dataset.r === "custom") b.hidden = state.range !== "custom";
+  }
+  for (const b of document.querySelectorAll("#measure button")) b.setAttribute("aria-pressed", b.dataset.m === state.measure);
+  $("#bucket").value = state.bucket;
+
+  // KPIs
+  let added = 0, removed = 0;
+  for (const c of inRange) for (const [a, d] of Object.values(c.f)) { added += a; removed += d; }
+  const sess = sessions(inRange, state.gap);
+  const active = sess.reduce((n, s) => n + s.end - s.start, 0);
+  const kpis = [
+    [fmtN(inRange.length), "commits"],
+    [`<span class="plus">+${fmtN(added)}</span>`, "lines added"],
+    [`<span class="minus">−${fmtN(removed)}</span>`, "lines removed"],
+    [fmtN(sess.length), "work sessions"],
+    [active ? fmtDur(active) : "—", "active time (first to last commit, per session)"],
+    [active >= MIN ? fmtN((added + removed) / (active / HOUR)) : "—", "lines changed per active hour"],
+  ];
+  $("#kpis").innerHTML = kpis.map(([v, l]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+  renderBars(r, inRange, unit, bkey, folders, color);
+  renderSessions(r, sess);
+  renderSize(r, all);
+  renderCommitTable(inRange, folders, color);
+}
+
+function renderBars(r, commits, unit, bkey, folders, color) {
+  const box = $("#bars"); box.innerHTML = "";
+  $("#barsTitle").textContent = `${state.measure === "lines" ? "Lines changed" : "Commits"} per ${BUCKET_NAME[bkey]}`;
+  const stacked = state.measure === "lines";
+  $("#legend").innerHTML = stacked ? folders.series.map(k => `<span><i style="background:${color[k]}"></i>${esc(k)}</span>`).join("") : "";
+
+  // Buckets covering the range
+  const buckets = [];
+  for (let t = unit.floor(r[0]); t < r[1]; t = unit.next(t)) buckets.push({ t0: t, t1: unit.next(t), v: {}, total: 0, commits: [] });
+  const idx = t => { let lo = 0, hi = buckets.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (buckets[m].t0 <= t) lo = m; else hi = m - 1; } return lo; };
+  for (const c of commits) {
+    const b = buckets[idx(c.t * 1000)]; b.commits.push(c);
+    if (stacked) for (const [k, [a, d]] of Object.entries(c.f)) { const s = folders.map[k]; b.v[s] = (b.v[s] || 0) + a + d; b.total += a + d; }
+    else b.total++;
+  }
+  const W = box.clientWidth || 800, H = 290, m = { l: 46, r: 8, t: 20, b: 34 };
+  const x0 = m.l, x1 = W - m.r, yBase = H - m.b;
+  const dom = [buckets[0].t0, buckets[buckets.length - 1].t1];
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": $("#barsTitle").textContent }, box);
+  // One or two huge bars (an initial import, a vendored library) would flatten the rest:
+  // when the biggest bar is over 3x the third biggest, the scale follows the third and taller bars are cut and labelled.
+  const totals = buckets.map(b => b.total).sort((a, b) => b - a);
+  const clipAt = totals.length > 3 && totals[0] > 3 * totals[2] && totals[2] > 0 ? totals[2] * 1.15 : Infinity;
+  const top = Math.max(1, Math.min(totals[0], clipAt));
+  const ymax = stacked ? niceMax(top) : Math.ceil(top / 4) * 4; // whole-number ticks for commit counts
+  const syRaw = v => yBase - v / ymax * (yBase - m.t);
+  const sy = v => Math.max(m.t, syRaw(v));
+  for (let i = 0; i <= 4; i++) {
+    const v = ymax * i / 4, y = syRaw(v);
+    el("line", { x1: x0, x2: x1, y1: y, y2: y, stroke: i ? "var(--grid)" : "var(--axis)", "stroke-width": 1 }, svg);
+    el("text", { x: x0 - 6, y: y + 4, "text-anchor": "end" }, svg).textContent = compact(v);
+  }
+  const sx = timeAxis(svg, x0, x1, dom, m.t, yBase);
+  const bars = el("g", {}, svg);
+  for (const b of buckets) {
+    const bx = sx(b.t0), bw = Math.max(1, sx(b.t1) - bx - 2);
+    const segs = stacked ? folders.series.filter(k => b.v[k]).map(k => [k, b.v[k]]) : (b.total ? [["", b.total]] : []);
+    let cum = 0;
+    segs.forEach(([k, v], i) => {
+      const yTop = sy(cum + v), yBot = sy(cum) - (i ? 2 : 0), h = yBot - yTop;
+      cum += v;
+      if (h <= 0) return;
+      const fill = stacked ? color[k] : "var(--s1)";
+      if (i === segs.length - 1 && bw >= 4) el("path", { d: roundTopPath(bx, yTop, bw, h, 4), fill }, bars);
+      else el("rect", { x: bx, y: yTop, width: bw, height: h, fill }, bars);
+    });
+    if (b.total > ymax) { // cut bar: a surface-coloured break near the top and the true value above it
+      el("rect", { x: bx - 1, y: m.t + 8, width: bw + 2, height: 3, fill: "var(--surface)" }, bars);
+      el("text", { x: bx + bw / 2, y: m.t - 2, "text-anchor": bx < x0 + 20 ? "start" : "middle", fill: "var(--ink-2)", style: "fill:var(--ink-2)" }, bars).textContent = compact(b.total);
+    }
+    // Hit target: the whole column
+    const hit = el("rect", { x: bx - 1, y: m.t, width: bw + 2, height: yBase - m.t, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", ev => {
+      if (drag) return;
+      const label = bkey === "1d" || bkey === "1w" || bkey === "1mo"
+        ? `${fmtDay(new Date(b.t0))}${bkey === "1d" ? "" : " – " + fmtDay(new Date(b.t1 - 1))}`
+        : `${fmtDay(new Date(b.t0))}, ${fmtTime(new Date(b.t0))}–${fmtTime(new Date(b.t1))}`;
+      let html = `<b>${label}</b>`;
+      if (stacked) {
+        html += `<div class="row"><span>Lines changed</span><b>${fmtN(b.total)}</b></div>`;
+        for (const [k, v] of segs.slice().reverse()) html += `<div class="row"><span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color[k]};margin-right:5px"></i>${esc(k)}</span><span>${fmtN(v)}</span></div>`;
+      }
+      html += `<div class="row"><span>Commits</span><b>${b.commits.length}</b></div>`;
+      for (const c of b.commits.slice(0, 3)) html += `<div class="muted">· ${esc(c.s)}</div>`;
+      if (b.commits.length > 3) html += `<div class="muted">and ${b.commits.length - 3} more</div>`;
+      showTip(html, ev);
+    });
+    hit.addEventListener("pointerleave", hideTip);
+  }
+  // Drag to zoom
+  let drag = null;
+  const selRect = el("rect", { y: m.t, height: yBase - m.t, fill: "var(--sel)", stroke: "var(--s1)", "stroke-width": 1, visibility: "hidden" }, svg);
+  const toX = ev => { const bb = svg.getBoundingClientRect(); return Math.min(x1, Math.max(x0, (ev.clientX - bb.left) * W / bb.width)); };
+  const toT = x => dom[0] + (x - x0) / (x1 - x0) * (dom[1] - dom[0]);
+  svg.addEventListener("pointerdown", ev => { if (ev.pointerType === "touch") return; drag = { a: toX(ev) }; svg.setPointerCapture(ev.pointerId); hideTip(); });
+  svg.addEventListener("pointermove", ev => {
+    if (!drag) return;
+    const b = toX(ev), lo = Math.min(drag.a, b);
+    selRect.setAttribute("x", lo); selRect.setAttribute("width", Math.abs(b - drag.a)); selRect.setAttribute("visibility", "visible");
+    drag.b = b;
+  });
+  svg.addEventListener("pointerup", () => {
+    if (drag && drag.b !== undefined && Math.abs(drag.b - drag.a) > 6) {
+      const t0 = toT(Math.min(drag.a, drag.b)), t1 = toT(Math.max(drag.a, drag.b));
+      if (t1 - t0 >= 10 * MIN) { state.custom = [t0, t1]; state.range = "custom"; if (state.bucket !== "auto") state.bucket = "auto"; drag = null; render(); return; }
+    }
+    drag = null; selRect.setAttribute("visibility", "hidden");
+  });
+}
+
+function renderSessions(r, sess) {
+  const box = $("#sessChart"); box.innerHTML = "";
+  $("#sessHint").textContent = `A break longer than ${state.gap} min starts a new session`;
+  const W = box.clientWidth || 800, H = 70, m = { l: 46, r: 8, t: 8, b: 34 };
+  const x0 = m.l, x1 = W - m.r, yBase = H - m.b;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": "Work sessions on a time line" }, box);
+  el("line", { x1: x0, x2: x1, y1: yBase, y2: yBase, stroke: "var(--axis)" }, svg);
+  const sx = timeAxis(svg, x0, x1, r, m.t, yBase, { grid: true });
+  for (const s of sess) {
+    const a = sx(s.start), w = Math.max(4, sx(s.end) - a);
+    const rect = el("rect", { x: a - (w === 4 ? 2 : 0), y: m.t + 2, width: w, height: yBase - m.t - 6, rx: 4, fill: "var(--s1)" }, svg);
+    const hit = el("rect", { x: a - 4, y: m.t, width: w + 8, height: yBase - m.t, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", ev => showTip(`<b>${fmtDT(s.start)} – ${fmtTime(new Date(s.end))}</b>
+      <div class="row"><span>Length</span><b>${fmtDur(s.end - s.start)}</b></div>
+      <div class="row"><span>Commits</span><b>${s.commits}</b></div>
+      <div class="row"><span>Lines changed</span><b>${fmtN(s.lines)}</b></div>`, ev));
+    hit.addEventListener("pointerleave", hideTip);
+  }
+  const rows = sess.slice().reverse().map(s => {
+    const dur = s.end - s.start;
+    const rate = dur >= 10 * MIN ? (s.commits / (dur / HOUR)).toFixed(1) : "—";
+    return `<tr><td>${fmtDT(s.start)}</td><td>${fmtTime(new Date(s.end))}${new Date(s.end).toDateString() !== new Date(s.start).toDateString() ? ` (${fmtDay(new Date(s.end))})` : ""}</td>
+      <td class="num">${fmtDur(dur)}</td><td class="num">${s.commits}</td><td class="num">${fmtN(s.lines)}</td><td class="num">${rate}</td></tr>`;
+  }).join("");
+  $("#sessTable").innerHTML = `<thead><tr><th>Start</th><th>End</th><th class="num">Length</th><th class="num">Commits</th><th class="num">Lines changed</th><th class="num">Commits per hour</th></tr></thead><tbody>${rows || `<tr><td colspan="6" class="hint">No commits in this period.</td></tr>`}</tbody>`;
+}
+
+function renderSize(r, all) {
+  const box = $("#size"); box.innerHTML = "";
+  // Cumulative net lines after every commit (whole history, so the level at the period start is right)
+  let net = 0; const pts = all.map(c => { for (const [a, d] of Object.values(c.f)) net += a - d; return { t: c.t * 1000, v: net, c }; });
+  const before = pts.filter(p => p.t < r[0]).pop();
+  const vis = pts.filter(p => p.t >= r[0] && p.t <= r[1]);
+  const series = [{ t: r[0], v: before ? before.v : 0 }, ...vis];
+  series.push({ t: r[1], v: series[series.length - 1].v });
+  const W = box.clientWidth || 800, H = 220, m = { l: 46, r: 8, t: 10, b: 34 };
+  const x0 = m.l, x1 = W - m.r, yBase = H - m.b;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": "Lines in the repository over time" }, box);
+  const ymax = niceMax(Math.max(1, ...series.map(p => p.v)));
+  const sy = v => yBase - v / ymax * (yBase - m.t);
+  for (let i = 0; i <= 4; i++) {
+    const v = ymax * i / 4, y = sy(v);
+    el("line", { x1: x0, x2: x1, y1: y, y2: y, stroke: i ? "var(--grid)" : "var(--axis)" }, svg);
+    el("text", { x: x0 - 6, y: y + 4, "text-anchor": "end" }, svg).textContent = compact(v);
+  }
+  const sx = timeAxis(svg, x0, x1, r, m.t, yBase);
+  let d = `M${sx(series[0].t)},${sy(series[0].v)}`;
+  for (let i = 1; i < series.length; i++) d += `H${sx(series[i].t)}V${sy(series[i].v)}`; // step: the size changes at each commit
+  el("path", { d: `${d}V${yBase}H${sx(series[0].t)}Z`, fill: "var(--s1)", opacity: 0.12 }, svg);
+  el("path", { d, fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+  const cross = el("line", { y1: m.t, y2: yBase, stroke: "var(--axis)", visibility: "hidden" }, svg);
+  const dot = el("circle", { r: 5, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }, svg);
+  const hit = el("rect", { x: x0, y: m.t, width: x1 - x0, height: yBase - m.t, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", ev => {
+    if (!vis.length) return;
+    const bb = svg.getBoundingClientRect(), x = (ev.clientX - bb.left) * W / bb.width;
+    const t = r[0] + (x - x0) / (x1 - x0) * (r[1] - r[0]);
+    let best = vis[0]; for (const p of vis) if (Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
+    const px = sx(best.t), py = sy(best.v);
+    cross.setAttribute("x1", px); cross.setAttribute("x2", px); cross.setAttribute("visibility", "visible");
+    dot.setAttribute("cx", px); dot.setAttribute("cy", py); dot.setAttribute("visibility", "visible");
+    let a = 0, dl = 0; for (const [x, y] of Object.values(best.c.f)) { a += x; dl += y; }
+    showTip(`<b>${fmtN(best.v)} lines</b><div class="muted">${fmtDT(best.t)} · <code>${best.c.h}</code></div>
+      <div>${esc(best.c.s)}</div><div><span class="plus">+${fmtN(a)}</span> <span class="minus">−${fmtN(dl)}</span></div>`, ev);
+  });
+  hit.addEventListener("pointerleave", () => { hideTip(); cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
+}
+
+function renderCommitTable(commits, folders, color) {
+  $("#commitHint").textContent = `${commits.length} commit${commits.length === 1 ? "" : "s"}, newest first`;
+  const rows = commits.slice().reverse().map(c => {
+    let a = 0, d = 0; const per = {};
+    for (const [k, [x, y]] of Object.entries(c.f)) { a += x; d += y; const s = folders.map[k]; per[s] = (per[s] || 0) + x + y; }
+    const chips = folders.series.filter(k => per[k]).map(k => `<span title="${esc(k)}: ${fmtN(per[k])} lines" style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color[k]};margin-right:3px"></span>`).join("");
+    return `<tr><td>${fmtDT(c.t * 1000)}</td><td><code>${c.h}</code></td><td class="msg">${esc(c.s)}</td>
+      <td class="num plus">+${fmtN(a)}</td><td class="num minus">−${fmtN(d)}</td><td>${chips}</td></tr>`;
+  }).join("");
+  $("#commitTable").innerHTML = `<thead><tr><th>When</th><th>Commit</th><th>Message</th><th class="num">Added</th><th class="num">Removed</th><th>Folders</th></tr></thead><tbody>${rows || `<tr><td colspan="6" class="hint">No commits in this period.</td></tr>`}</tbody>`;
+}
+
+/* ---------- wiring ---------- */
+async function load() {
+  $("#err").textContent = "";
+  try {
+    const res = await fetch("/api/data", { cache: "no-store" });
+    if (!res.ok) throw new Error(await res.text());
+    state.data = await res.json();
+    $("#title").textContent = `Git pace · ${state.data.repo}`;
+    $("#path").textContent = state.data.path;
+    document.title = `Git Pace · ${state.data.repo}`;
+    render();
+  } catch (e) { $("#err").textContent = "Could not read the history: " + e.message; }
+}
+$("#ranges").addEventListener("click", e => { const r = e.target.dataset.r; if (r && r !== "custom") { state.range = r; render(); } });
+$("#measure").addEventListener("click", e => { const m = e.target.dataset.m; if (m) { state.measure = m; render(); } });
+$("#bucket").addEventListener("change", e => { state.bucket = e.target.value; render(); });
+$("#gap").addEventListener("change", e => { state.gap = +e.target.value; render(); });
+$("#refresh").addEventListener("click", load);
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 120); });
+load();
+</script>
+</body>
+</html>
